@@ -1,242 +1,217 @@
 # Hermes — Personal AI Assistant Experiment
 
-> An ongoing experimentation project exploring persistent AI assistant workflows,
-> skill-based automation, and practical agentic system design.
+> Ongoing experimentation with persistent AI assistant workflows, skill-based automation and operational AI tooling.
 
 ---
 
-## Overview
+# Overview
 
-This project is a practical exploration of what it takes to run a **persistent, personalised AI assistant** on personal infrastructure — not as a commercial product, but as a learning exercise in agentic system design, operational AI thinking, and real-world workflow automation.
+This project is a hands-on exploration of how a persistent AI assistant can support practical everyday workflows through structured skills, memory, automation and integrations.
 
-The assistant runs on a self-hosted VPS using [Hermes Agent](https://hermes-agent.nousresearch.com/) (Nous Research, MIT licence) with Anthropic's Claude as the underlying model. Interaction happens entirely through Telegram, making it accessible from any device without a dedicated frontend.
+The assistant runs on a self-hosted VPS using Hermes Agent with Anthropic Claude as the underlying model. Interaction happens primarily through Telegram, allowing the assistant to be available continuously without a dedicated frontend.
 
-This is not a demo. It runs continuously, handles real tasks, and is iterated on weekly.
+The project is not intended as a commercial product. Its primary purpose is to better understand:
 
----
-
-## Project Goal
-
-To understand — through hands-on experimentation — how a persistent AI assistant can:
-
-- Reduce cognitive overhead in everyday planning (meals, shopping, schedules)
-- Filter information noise (market updates, email newsletters, deal alerts)
-- Integrate with external services (calendars, task managers, data APIs)
-- Scale in capability through composable skills and MCP integrations
-- Operate reliably on modest infrastructure without managed cloud services
-
-The working hypothesis: **a well-configured, persistent agent with good memory and targeted skills outperforms a general-purpose chatbot for personal workflow automation** — even on lightweight hardware.
+* Persistent AI workflows
+* Agent-based interaction patterns
+* AI-assisted automation
+* Workflow orchestration
+* Practical operational considerations for self-hosted AI systems
 
 ---
 
-## High-Level Architecture
+# Project Goal
 
-```
-┌─────────────────────────────────────────────────┐
-│  Users (Telegram)                               │
-│  ─ Primary user (mobile + desktop)             │
-│  ─ Secondary user (mobile, WhatsApp planned)   │
-└─────────────────────┬───────────────────────────┘
-                      │
-┌─────────────────────▼───────────────────────────┐
-│  Hermes Gateway (Docker, self-hosted VPS)       │
-│                                                  │
-│  ┌──────────────────────────────────────────┐   │
-│  │  Agent                                   │   │
-│  │  Model: Claude Sonnet 4.6 (Anthropic)   │   │
-│  │  Memory: Honcho + FTS5 (persistent)      │   │
-│  │  Skills: custom + bundled                │   │
-│  └──────────────────────────────────────────┘   │
-└─────────────────────┬───────────────────────────┘
-                      │
-┌─────────────────────▼───────────────────────────┐
-│  Integrations                                    │
-│  ─ Todoist REST API (task/list management)      │
-│  ─ Google Workspace (Calendar, Gmail) [planned] │
-│  ─ MCP servers (crypto data, weather) [planned] │
-│  ─ Internal cron job outputs [read-only]        │
-└─────────────────────────────────────────────────┘
-```
+The goal is to explore how a persistent AI assistant can:
 
-**Key design decisions:**
+* Reduce friction in recurring workflows
+* Structure and retrieve context over time
+* Integrate with external tools and APIs
+* Support lightweight automation tasks
+* Operate reliably on modest infrastructure
 
-- **Single agent, multiple tools** — one persistent assistant routes to skills and APIs rather than spawning separate bots per domain
-- **Memory over re-prompting** — the agent accumulates facts about preferences, habits, and context across sessions via a structured memory layer
-- **Read-only by default** — integrations that touch external systems (trading outputs, email) default to read-only access until explicit write permissions are added
+The project is treated primarily as a workflow and product exploration exercise rather than a traditional software engineering project.
 
 ---
 
-## VPS & Runtime Setup
+# High-Level Architecture
 
-The assistant runs inside a Docker container on a Linux VPS (Ubuntu 24.04 LTS). A named Docker volume persists all configuration, skills, memory, and session history across restarts.
-
-```bash
-# Start the assistant (production configuration)
-docker run -d \
-  --name hermes \
-  --restart unless-stopped \
-  --memory=1.5g \
-  --cpus=1.0 \
-  -v hermes-data:/opt/data \
-  nousresearch/hermes-agent:latest \
-  hermes gateway run
+```text
+Telegram
+   ↓
+Hermes Agent (VPS-hosted)
+   ↓
+Claude API
+   ↓
+Skills / Workflows / Integrations
 ```
 
-Notable operational choices:
+Key design principles:
 
-- **Resource limits** prevent the assistant from competing with other processes on the same host
-- **`--restart unless-stopped`** ensures it recovers automatically after reboots or crashes
-- **Named volumes** (not bind mounts) were chosen to avoid user permission conflicts between the host (`root`) and the container's internal `hermes` user
-- **SSH access** is key-only, passphrase-protected, with fail2ban and UFW active
-
-The model is configurable at runtime:
-
-```bash
-hermes config set model.default claude-sonnet-4-6
-hermes config set model.provider anthropic
-```
-
-Switching from Claude Opus to Sonnet reduced per-interaction cost by approximately 40% with negligible quality difference for everyday tasks.
+* One persistent assistant rather than multiple standalone bots
+* Skill-based workflows for structured task handling
+* Persistent memory and context over isolated prompting
+* Read-only integrations by default unless explicitly expanded
 
 ---
 
-## Skill-Based Workflow Structure
+# VPS & Runtime Setup
 
-Skills are the primary mechanism for extending the assistant's capabilities. Each skill is a structured markdown file that defines:
+The assistant runs continuously on a self-hosted Linux VPS using container-based deployment.
 
-- When the skill should activate (trigger phrases and context)
-- What the skill should produce (output format, constraints)
-- What pitfalls to avoid (common failure modes)
-- A verification checklist (for the agent to self-check before responding)
+The VPS setup is primarily used to:
 
-```
+* Keep workflows available continuously
+* Separate experiments from local devices
+* Better understand operational aspects of persistent AI systems
+* Explore lightweight self-hosted infrastructure patterns
+
+Current experimentation includes:
+
+* Persistent runtime configuration
+* Skill-based workflow organization
+* Scheduled automation tasks
+* Telegram-based interaction workflows
+* API and MCP integration exploration
+
+---
+
+# Skill-Based Workflow Structure
+
+Skills are the primary mechanism for extending the assistant's capabilities.
+
+Each skill defines:
+
+* When it should activate
+* What it should produce
+* Constraints and formatting rules
+* Workflow-specific instructions
+
+Example structure:
+
+```text
 ~/.hermes/skills/
 └── productivity/
     └── meal-planner/
         └── SKILL.md
 ```
 
-Skills are created collaboratively — in this project, skills are authored by asking the assistant to load the `hermes-agent-skill-authoring` meta-skill and then describing requirements in natural language. The agent writes, formats, and saves the skill file itself using `skill_manage(action='create')`.
-
-**Example: Meal planner skill**
-
-The meal planner skill generates weekly dinner menus for a household with specific dietary preferences, time constraints, and a defined pantry baseline. It:
-
-- Produces menus in a consistent, structured format
-- Generates a shopping list with pantry items flagged so they can be crossed off
-- Proposes portion sizes based on household composition (not gram-weights for fish, but fillet counts)
-- Checks memory for recently used recipes to avoid repetition
-- Ends with a confirmation prompt before committing the plan
-
-After approval, future phases will push the shopping list to Todoist and add dinner events to Google Calendar automatically.
+The current focus is less about building large autonomous systems and more about understanding how smaller, focused skills can improve workflow reliability and reduce repetitive prompting.
 
 ---
 
-## Telegram Interaction Model
+# Telegram Interaction Model
 
-Telegram was chosen as the primary interface for several reasons:
+Telegram was chosen as the primary interface because it:
 
-- Both household members already use it
-- The Bot API supports group chats, inline keyboards, and voice message transcription (via Whisper)
-- The Hermes gateway handles multi-user allowlisting natively
-- No custom frontend is required
+* Requires no custom frontend
+* Supports lightweight interaction workflows
+* Makes the assistant accessible across devices
+* Enables rapid iteration of conversational workflows
 
-**Access control:**
+Current interaction patterns include:
 
-The bot is private by default. Only explicitly allowlisted Telegram user IDs receive responses. All other messages are silently dropped at the gateway layer — no API calls are made.
-
-**Group chat behaviour:**
-
-When multiple users are present in a group chat, the agent opens with a neutral framing ("Here's a proposed menu — let me know if you'd like to change anything") and shifts to first-name addressing once a specific user responds. This avoids the assistant presuming which user is active.
-
-**Planned: WhatsApp gateway**
-
-A second household member prefers WhatsApp over Telegram. Hermes supports a WhatsApp gateway via Baileys bridge. When activated, both users will share the same agent instance and the same persistent memory — interactions from either channel inform the same context.
+* Conversational task execution
+* Skill-triggered workflows
+* Lightweight automation commands
+* Context-aware assistant interactions
 
 ---
 
-## API & MCP Exploration
+# API & MCP Exploration
 
-**Current: Todoist REST API**
+The project also explores lightweight integrations through APIs and MCP-compatible workflows.
 
-Rather than routing through an integration platform (e.g. Composio), Todoist is connected directly via a personal API token stored in the container's `.env` file. This keeps the integration stack flat and avoids third-party dependencies for a low-volume personal use case.
+Areas currently being explored include:
 
-**Planned: MCP integrations**
+* External data retrieval
+* Task and workflow integrations
+* Context-aware summaries
+* AI-assisted information filtering
+* Persistent workflow orchestration
 
-The Model Context Protocol (MCP) is an open standard that allows AI agents to connect to external data sources and tools without custom connector code. Hermes has native MCP support.
-
-Planned MCP integrations, in rough priority order:
-
-| MCP | Purpose |
-|---|---|
-| CoinGecko / CoinMarketCap | Market data summaries for tracked assets (not trading signals) |
-| Weather | Contextual recommendations (clothing, outdoor activities) |
-| Google Workspace | Calendar read/write, Gmail filtering |
-| Home Assistant | Smart home integration (future) |
-
-The pattern being tested: **define a small set of named assets or interests, let the agent pull current data via MCP, and receive a concise natural-language summary rather than raw data**. The goal is signal extraction, not data display.
+The primary interest is not raw data access itself, but how AI assistants can transform fragmented information into usable workflow support.
 
 ---
 
-## Operational Considerations
+# Operational Considerations
 
-**Cost management**
+One of the more interesting learnings from the project is that persistent AI workflows quickly become operational systems rather than simple chatbot experiments.
 
-Running Claude Sonnet 4.6 via the Anthropic API at typical personal usage (~20–40 messages/day including agent tool calls) costs roughly $10–20/month. Early testing with Opus 4.7 ran significantly higher due to a tokenizer change that increased effective token usage by ~35% for the same input length.
+Even relatively small setups introduce considerations around:
 
-Practical cost controls in use:
-- Sonnet 4.6 as default (not Opus)
-- Compressed SOUL.md persona file to reduce per-message system prompt overhead
-- Instructed the agent to respond concisely and avoid unnecessary preamble
-- Context compression enabled at 50% threshold (built into Hermes)
-- Separate API key per workload for granular cost tracking
+* Reliability
+* Context persistence
+* Workflow organization
+* Runtime management
+* Integration boundaries
+* Cost vs. capability tradeoffs
 
-**Coexistence with existing automation**
-
-The VPS also runs a separate trading analysis script on a cron schedule. The two systems are isolated by design — the assistant has no write access to the trading process and currently has no read access either. Future integration will be read-only: the assistant will summarise outputs from log files, not interact with the trading logic directly.
-
-**Known limitations**
-
-During setup, a bug was identified in Hermes (issue [#26596](https://github.com/NousResearch/hermes-agent/issues/26596)) where `SOUL.md` persona files are not reliably loaded in gateway mode. The workaround observed in practice: the persistent memory layer (`USER.md`) accumulates persona-relevant facts over time from conversations, effectively substituting for the static persona file in steady-state usage. The agent's behaviour converges toward the intended persona within a few sessions without requiring a code-level fix.
-
-This kind of **"debug in production, document the gap, find the workaround"** cycle is a core part of what makes this project useful as a learning exercise.
+This has made the project particularly valuable as a practical learning exercise in operational AI thinking.
 
 ---
 
-## Selected Screenshots
+# Selected Screenshots
 
-> Screenshots available in `/screenshots/` directory in this repository.
+Example screenshots are available in the `/screenshots/hermes` directory.
 
-Suggested captures:
-- Telegram conversation showing meal plan generation and confirmation flow
-- VPS terminal: `docker ps`, skills directory, uptime
-- Hermes config output showing model and platform settings
-- Memory file (`USER.md`) showing accumulated household context
+Included examples currently cover:
 
----
-
-## Key Learnings
-
-**On persistent memory vs. static prompts**
-
-A static system prompt (SOUL.md) is fragile — it has to be right from day one and doesn't adapt. A memory layer that accumulates facts from real conversations is more robust. The agent corrects its own misunderstandings (e.g. inferring the correct legal name structure for household members from conversational context) without being explicitly programmed to do so.
-
-**On skill design**
-
-Skills work best when they are narrow and opinionated. A meal planner skill that knows the household's pantry baseline, portion conventions, and dietary preferences produces far better output than a generic "plan meals" prompt. The effort of writing a good skill pays back immediately and compounds over time.
-
-**On cost vs. capability**
-
-Frontier models are not always necessary. For everyday assistant tasks — planning, summarising, formatting, routing — a mid-tier model (Sonnet) is indistinguishable from a frontier model (Opus) in practice, at 40% lower cost. The cases where Opus is worth it are narrow: complex multi-step reasoning, code generation, or novel problem-solving.
-
-**On agentic system design**
-
-The most useful framing for this project has been: **the agent is an orchestration layer, not a capability layer**. It does not need to know how to book a flight — it needs to know when to call a tool that books flights. Keeping this separation clean makes the system easier to extend, easier to debug, and cheaper to run.
-
-**On adoption and validation**
-
-The critical unknown for personal automation is whether a second person (the other household member) will actually use it. The system is technically functional, but adoption depends on friction — and friction is determined by interface choice, response quality, and whether the agent saves more time than it costs to interact with. This is being treated as a product problem, not a technical one.
+* Skill architecture overview
+* VPS runtime overview
+* Telegram-based interaction workflows
 
 ---
 
-*This project is built and iterated on as a personal learning exercise. It is not production software.*
+# Key Learnings
+
+## Persistent memory matters more than expected
+
+One recurring observation is that workflow quality often depends more on context structure and memory handling than on raw model capability alone.
+
+---
+
+## AI-assisted development improves workflow iteration
+
+Modern AI tooling makes it significantly easier to prototype workflows, validate ideas and structure product concepts before investing heavily in implementation.
+
+This has been especially useful for:
+
+* Workflow experimentation
+* Skill design
+* Rapid iteration
+* Operational prototyping
+* Exploring integration patterns
+
+---
+
+## Small focused workflows outperform generic prompting
+
+Smaller, structured skills tend to produce more reliable and repeatable outputs than broad generic prompts.
+
+The combination of:
+
+* Persistent context
+* Focused skills
+* Lightweight integrations
+
+appears significantly more useful than treating the assistant as a standalone chatbot.
+
+---
+
+## Adoption is primarily a product problem
+
+One of the most important observations so far is that successful AI-assisted workflows depend less on technical capability and more on usability and friction.
+
+The key questions are:
+
+* Does the workflow save time?
+* Is the interaction model intuitive?
+* Is the assistant reliable enough to trust?
+* Does the workflow fit naturally into existing habits?
+
+This has reinforced the idea that persistent AI systems are as much a product and workflow design problem as a technical one.
+
+---
+
+*This project is built and iterated on as a personal learning exercise focused on AI-assisted workflows and operational experimentation.*
