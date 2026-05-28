@@ -187,12 +187,12 @@ Notable product and technical decisions:
 
 ## Screenshots
 
-Screenshots can be added for portfolio use after they have been reviewed for privacy. Recommended screenshots:
+Example screenshots for selected workflows and UI flows can be found in the `/screenshots/hyttehub` directory.
 
-- login or welcome screen with demo-only data;
-- cabin overview with placeholder names/images;
-- booking dialog using non-real dates and names;
-- admin checklist or inventory view with sample content; and
-- mobile/PWA view showing responsive behavior.
+Included examples currently cover:
 
-Before publishing screenshots, verify that they do not show real names, private booking dates, tokens, internal URLs, browser bookmarks, account emails, or infrastructure identifiers.
+* User login flow
+* Landing / overview page
+* Cabin booking workflow
+* Checklist functionality
+* Responsive mobile-oriented UI patterns
