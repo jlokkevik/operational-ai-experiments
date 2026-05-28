@@ -105,7 +105,7 @@ See:
 
 * Some implementation details and repositories remain private due to security and infrastructure considerations.
 * All screenshots and examples included here have been reviewed to avoid exposing credentials, secrets, personal data or sensitive infrastructure details.
-* All projects in this repository involve significant AI-assisted development and iteration workflows rather than traditional software engineering from scratch.
+* All projects described in this repository involve significant AI-assisted development and iteration workflows rather than traditional software engineering from scratch.
 
 ---
 
