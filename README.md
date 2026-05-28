@@ -55,7 +55,7 @@ Built a lightweight automation environment using AI-assisted development workflo
 ### My Role
 
 * Set up and secured a Linux VPS environment with AI assistance
-* Built Python-based automation scripts through iterative prompting workflows
+* Built Python-based automation scripts through iterative prompting
 * Uploaded and managed scripts through terminal-based workflows
 * Set up Telegram integrations for interaction and command execution
 * Integrated APIs for market data retrieval and AI-assisted interpretation
