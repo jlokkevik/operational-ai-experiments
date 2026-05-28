@@ -41,7 +41,7 @@ notes/
 
 ## HytteHub
 
-Private product experiment focused on lightweight product development, AI-assisted iteration workflows and user-focused design.
+Private product experiment focused on lightweight product development (Lovable), AI-assisted iteration workflows and user-focused design.
 
 Areas explored include:
 
