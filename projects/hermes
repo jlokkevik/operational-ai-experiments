@@ -1,0 +1,242 @@
+# Hermes — Personal AI Assistant Experiment
+
+> An ongoing experimentation project exploring persistent AI assistant workflows,
+> skill-based automation, and practical agentic system design.
+
+---
+
+## Overview
+
+This project is a practical exploration of what it takes to run a **persistent, personalised AI assistant** on personal infrastructure — not as a commercial product, but as a learning exercise in agentic system design, operational AI thinking, and real-world workflow automation.
+
+The assistant runs on a self-hosted VPS using [Hermes Agent](https://hermes-agent.nousresearch.com/) (Nous Research, MIT licence) with Anthropic's Claude as the underlying model. Interaction happens entirely through Telegram, making it accessible from any device without a dedicated frontend.
+
+This is not a demo. It runs continuously, handles real tasks, and is iterated on weekly.
+
+---
+
+## Project Goal
+
+To understand — through hands-on experimentation — how a persistent AI assistant can:
+
+- Reduce cognitive overhead in everyday planning (meals, shopping, schedules)
+- Filter information noise (market updates, email newsletters, deal alerts)
+- Integrate with external services (calendars, task managers, data APIs)
+- Scale in capability through composable skills and MCP integrations
+- Operate reliably on modest infrastructure without managed cloud services
+
+The working hypothesis: **a well-configured, persistent agent with good memory and targeted skills outperforms a general-purpose chatbot for personal workflow automation** — even on lightweight hardware.
+
+---
+
+## High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  Users (Telegram)                               │
+│  ─ Primary user (mobile + desktop)             │
+│  ─ Secondary user (mobile, WhatsApp planned)   │
+└─────────────────────┬───────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────┐
+│  Hermes Gateway (Docker, self-hosted VPS)       │
+│                                                  │
+│  ┌──────────────────────────────────────────┐   │
+│  │  Agent                                   │   │
+│  │  Model: Claude Sonnet 4.6 (Anthropic)   │   │
+│  │  Memory: Honcho + FTS5 (persistent)      │   │
+│  │  Skills: custom + bundled                │   │
+│  └──────────────────────────────────────────┘   │
+└─────────────────────┬───────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────┐
+│  Integrations                                    │
+│  ─ Todoist REST API (task/list management)      │
+│  ─ Google Workspace (Calendar, Gmail) [planned] │
+│  ─ MCP servers (crypto data, weather) [planned] │
+│  ─ Internal cron job outputs [read-only]        │
+└─────────────────────────────────────────────────┘
+```
+
+**Key design decisions:**
+
+- **Single agent, multiple tools** — one persistent assistant routes to skills and APIs rather than spawning separate bots per domain
+- **Memory over re-prompting** — the agent accumulates facts about preferences, habits, and context across sessions via a structured memory layer
+- **Read-only by default** — integrations that touch external systems (trading outputs, email) default to read-only access until explicit write permissions are added
+
+---
+
+## VPS & Runtime Setup
+
+The assistant runs inside a Docker container on a Linux VPS (Ubuntu 24.04 LTS). A named Docker volume persists all configuration, skills, memory, and session history across restarts.
+
+```bash
+# Start the assistant (production configuration)
+docker run -d \
+  --name hermes \
+  --restart unless-stopped \
+  --memory=1.5g \
+  --cpus=1.0 \
+  -v hermes-data:/opt/data \
+  nousresearch/hermes-agent:latest \
+  hermes gateway run
+```
+
+Notable operational choices:
+
+- **Resource limits** prevent the assistant from competing with other processes on the same host
+- **`--restart unless-stopped`** ensures it recovers automatically after reboots or crashes
+- **Named volumes** (not bind mounts) were chosen to avoid user permission conflicts between the host (`root`) and the container's internal `hermes` user
+- **SSH access** is key-only, passphrase-protected, with fail2ban and UFW active
+
+The model is configurable at runtime:
+
+```bash
+hermes config set model.default claude-sonnet-4-6
+hermes config set model.provider anthropic
+```
+
+Switching from Claude Opus to Sonnet reduced per-interaction cost by approximately 40% with negligible quality difference for everyday tasks.
+
+---
+
+## Skill-Based Workflow Structure
+
+Skills are the primary mechanism for extending the assistant's capabilities. Each skill is a structured markdown file that defines:
+
+- When the skill should activate (trigger phrases and context)
+- What the skill should produce (output format, constraints)
+- What pitfalls to avoid (common failure modes)
+- A verification checklist (for the agent to self-check before responding)
+
+```
+~/.hermes/skills/
+└── productivity/
+    └── meal-planner/
+        └── SKILL.md
+```
+
+Skills are created collaboratively — in this project, skills are authored by asking the assistant to load the `hermes-agent-skill-authoring` meta-skill and then describing requirements in natural language. The agent writes, formats, and saves the skill file itself using `skill_manage(action='create')`.
+
+**Example: Meal planner skill**
+
+The meal planner skill generates weekly dinner menus for a household with specific dietary preferences, time constraints, and a defined pantry baseline. It:
+
+- Produces menus in a consistent, structured format
+- Generates a shopping list with pantry items flagged so they can be crossed off
+- Proposes portion sizes based on household composition (not gram-weights for fish, but fillet counts)
+- Checks memory for recently used recipes to avoid repetition
+- Ends with a confirmation prompt before committing the plan
+
+After approval, future phases will push the shopping list to Todoist and add dinner events to Google Calendar automatically.
+
+---
+
+## Telegram Interaction Model
+
+Telegram was chosen as the primary interface for several reasons:
+
+- Both household members already use it
+- The Bot API supports group chats, inline keyboards, and voice message transcription (via Whisper)
+- The Hermes gateway handles multi-user allowlisting natively
+- No custom frontend is required
+
+**Access control:**
+
+The bot is private by default. Only explicitly allowlisted Telegram user IDs receive responses. All other messages are silently dropped at the gateway layer — no API calls are made.
+
+**Group chat behaviour:**
+
+When multiple users are present in a group chat, the agent opens with a neutral framing ("Here's a proposed menu — let me know if you'd like to change anything") and shifts to first-name addressing once a specific user responds. This avoids the assistant presuming which user is active.
+
+**Planned: WhatsApp gateway**
+
+A second household member prefers WhatsApp over Telegram. Hermes supports a WhatsApp gateway via Baileys bridge. When activated, both users will share the same agent instance and the same persistent memory — interactions from either channel inform the same context.
+
+---
+
+## API & MCP Exploration
+
+**Current: Todoist REST API**
+
+Rather than routing through an integration platform (e.g. Composio), Todoist is connected directly via a personal API token stored in the container's `.env` file. This keeps the integration stack flat and avoids third-party dependencies for a low-volume personal use case.
+
+**Planned: MCP integrations**
+
+The Model Context Protocol (MCP) is an open standard that allows AI agents to connect to external data sources and tools without custom connector code. Hermes has native MCP support.
+
+Planned MCP integrations, in rough priority order:
+
+| MCP | Purpose |
+|---|---|
+| CoinGecko / CoinMarketCap | Market data summaries for tracked assets (not trading signals) |
+| Weather | Contextual recommendations (clothing, outdoor activities) |
+| Google Workspace | Calendar read/write, Gmail filtering |
+| Home Assistant | Smart home integration (future) |
+
+The pattern being tested: **define a small set of named assets or interests, let the agent pull current data via MCP, and receive a concise natural-language summary rather than raw data**. The goal is signal extraction, not data display.
+
+---
+
+## Operational Considerations
+
+**Cost management**
+
+Running Claude Sonnet 4.6 via the Anthropic API at typical personal usage (~20–40 messages/day including agent tool calls) costs roughly $10–20/month. Early testing with Opus 4.7 ran significantly higher due to a tokenizer change that increased effective token usage by ~35% for the same input length.
+
+Practical cost controls in use:
+- Sonnet 4.6 as default (not Opus)
+- Compressed SOUL.md persona file to reduce per-message system prompt overhead
+- Instructed the agent to respond concisely and avoid unnecessary preamble
+- Context compression enabled at 50% threshold (built into Hermes)
+- Separate API key per workload for granular cost tracking
+
+**Coexistence with existing automation**
+
+The VPS also runs a separate trading analysis script on a cron schedule. The two systems are isolated by design — the assistant has no write access to the trading process and currently has no read access either. Future integration will be read-only: the assistant will summarise outputs from log files, not interact with the trading logic directly.
+
+**Known limitations**
+
+During setup, a bug was identified in Hermes (issue [#26596](https://github.com/NousResearch/hermes-agent/issues/26596)) where `SOUL.md` persona files are not reliably loaded in gateway mode. The workaround observed in practice: the persistent memory layer (`USER.md`) accumulates persona-relevant facts over time from conversations, effectively substituting for the static persona file in steady-state usage. The agent's behaviour converges toward the intended persona within a few sessions without requiring a code-level fix.
+
+This kind of **"debug in production, document the gap, find the workaround"** cycle is a core part of what makes this project useful as a learning exercise.
+
+---
+
+## Selected Screenshots
+
+> Screenshots available in `/screenshots/` directory in this repository.
+
+Suggested captures:
+- Telegram conversation showing meal plan generation and confirmation flow
+- VPS terminal: `docker ps`, skills directory, uptime
+- Hermes config output showing model and platform settings
+- Memory file (`USER.md`) showing accumulated household context
+
+---
+
+## Key Learnings
+
+**On persistent memory vs. static prompts**
+
+A static system prompt (SOUL.md) is fragile — it has to be right from day one and doesn't adapt. A memory layer that accumulates facts from real conversations is more robust. The agent corrects its own misunderstandings (e.g. inferring the correct legal name structure for household members from conversational context) without being explicitly programmed to do so.
+
+**On skill design**
+
+Skills work best when they are narrow and opinionated. A meal planner skill that knows the household's pantry baseline, portion conventions, and dietary preferences produces far better output than a generic "plan meals" prompt. The effort of writing a good skill pays back immediately and compounds over time.
+
+**On cost vs. capability**
+
+Frontier models are not always necessary. For everyday assistant tasks — planning, summarising, formatting, routing — a mid-tier model (Sonnet) is indistinguishable from a frontier model (Opus) in practice, at 40% lower cost. The cases where Opus is worth it are narrow: complex multi-step reasoning, code generation, or novel problem-solving.
+
+**On agentic system design**
+
+The most useful framing for this project has been: **the agent is an orchestration layer, not a capability layer**. It does not need to know how to book a flight — it needs to know when to call a tool that books flights. Keeping this separation clean makes the system easier to extend, easier to debug, and cheaper to run.
+
+**On adoption and validation**
+
+The critical unknown for personal automation is whether a second person (the other household member) will actually use it. The system is technically functional, but adoption depends on friction — and friction is determined by interface choice, response quality, and whether the agent saves more time than it costs to interact with. This is being treated as a product problem, not a technical one.
+
+---
+
+*This project is built and iterated on as a personal learning exercise. It is not production software.*
