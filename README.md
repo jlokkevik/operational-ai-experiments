@@ -62,7 +62,7 @@ Related screenshots:
 
 ---
 
-## Hermes
+## Hermes Agent
 
 Ongoing experimentation project focused on persistent AI assistant workflows, self-hosted AI tooling and operational AI systems.
 
